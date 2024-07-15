@@ -1,4 +1,4 @@
-import gym
+import gymansium as gym
 import numpy as np
 import wandb
 import os
@@ -14,7 +14,7 @@ class VideoWrapper(gym.Wrapper):
 
     def reset(self, **kwargs):
         self.episode_states[0].clear()
-        state = self.env.reset()
+        state, info = self.env.reset()
         state_visual, state_vector = state
         for i in range(self.nb_observation):
             # import pdb; pdb.set_trace()
@@ -22,17 +22,17 @@ class VideoWrapper(gym.Wrapper):
             # self.episode_states[i].append(state_visual[np.newaxis, i, :, :])
             self.episode_states[i].append(state_visual[np.newaxis, np.newaxis, i, :, :])
 
-        return state
+        return state, info
 
     def step(self, action):
-        state, reward, done, info = self.env.step(action)
+        state, reward, terminate, truncate, info = self.env.step(action)
         state_visual, state_vector = state
         for i in range(self.nb_observation):
             # self.episode_states[i].append(state_visual[np.newaxis, i, :, :])
             # import pdb;pdb.set_trace()
             self.episode_states[i].append(state_visual[np.newaxis, np.newaxis, i, :, :])
 
-        return state, reward, done, info
+        return state, reward, terminate, truncate, info
 
     def send_wandb_video(self, prefix=""):
         for i in range(self.nb_observation):
@@ -51,20 +51,20 @@ class PandaGymVideo(gym.Wrapper):
         if self.episode_counter % self.episode_log_frequency == 0 and len(self.episode_states) > 0:
             self.send_panda_video()
         self.episode_states.clear()
-        state = self.env.reset()
+        state, info = self.env.reset()
         self.episode_counter += 1
 
         if self.episode_counter % self.episode_log_frequency == 0:
             state_visual = self.env.get_all_sides_image(256, 256)
             self.episode_states.append(state_visual[np.newaxis, :, :, :])
-        return state
+        return state, info
 
     def step(self, action):
-        state, reward, done, info = self.env.step(action)
+        state, reward, terminate, truncate, info = self.env.step(action)
         if (self.episode_counter) % self.episode_log_frequency == 0:
             state_visual = self.env.get_all_sides_image(256, 256)
             self.episode_states.append(state_visual[np.newaxis, :, :, :])
-        return state, reward, done, info
+        return state, reward, terminate, truncate, info
 
     def send_panda_video(self):
         wandb.log({"high_res": wandb.Video(np.concatenate(self.episode_states), fps=12, format="gif")})

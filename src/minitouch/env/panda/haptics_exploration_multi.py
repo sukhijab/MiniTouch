@@ -7,6 +7,7 @@ import random
 from minitouch.env.panda.panda_haptics import PandaHaptics
 from minitouch.env.panda.common.bound_3d import Bound3d
 from minitouch.env.panda.common.log_specification import LogSpecification
+from typing import Any
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
@@ -43,11 +44,14 @@ class HapticsExplorationMulti(PandaHaptics):
 
         self.last_cube_id = None
 
-    def reset(self):
-        state = super().reset()
-
+    def reset(self,
+              *,
+              seed: int | None = None,
+              options: dict[str, Any] | None = None,
+              ):
+        state, _ = super().reset()
         self.place_objects()
-        return state
+        return state, self._get_info()
 
     def place_objects(self):
         num_objects = random.randint(self.number_of_object_interval[0], self.number_of_object_interval[1])

@@ -1,7 +1,8 @@
-import gym
-from gym import spaces
+import gymnasium
+from gymnasium import spaces
 
-import os, inspect
+import os
+import inspect
 
 import pybullet as p
 import math
@@ -12,11 +13,17 @@ parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 urdfRootPath = currentdir + "/assets/"
 import time
+from typing import Any
 
-class PandaEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
 
-    def __init__(self, debug=False, grayscale=True, lf_force=500, rf_force=450):
+class PandaEnv(gymnasium.Env):
+    metadata = {'render_modes': ['rgb_array']}
+
+    def __init__(self, debug: bool = False, grayscale: bool = True, lf_force: float = 500, rf_force: bool = 450,
+                 render_mode: str = 'rgb_array',
+                 ):
+        super().__init__()
+        self.render_mode = render_mode
         if debug:
             p.connect(p.GUI)
         else:
@@ -62,22 +69,27 @@ class PandaEnv(gym.Env):
         p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=0, cameraPitch=-40,
                                      cameraTargetPosition=[0.55, -0.35, 0.2])
 
-        #self.fixedTimeStep = 1. / 500
-        #numSolverIterations = 200
+        # self.fixedTimeStep = 1. / 500
+        # numSolverIterations = 200
 
-        #p.setPhysicsEngineParameter(fixedTimeStep=self.fixedTimeStep, numSolverIterations=numSolverIterations)
+        # p.setPhysicsEngineParameter(fixedTimeStep=self.fixedTimeStep, numSolverIterations=numSolverIterations)
 
-        #control_dt = 1. / 240.
-        #p.setTimestep = control_dt
+        # control_dt = 1. / 240.
+        # p.setTimestep = control_dt
 
         self.observation_space = spaces.Box(low=-1, high=1, shape=(8,))
         self.action_space = spaces.Box(low=-1, high=1, shape=(4,))
 
-    def reset(self):
+    def reset(self,
+              *,
+              seed: int | None = None,
+              options: dict[str, Any] | None = None,
+              ):
         """
         Gym reset episode function.
         :return: state
         """
+        super().reset(seed=seed, options=options)
         self.episode_counter += 1
         self.episode_step_counter = 0
         p.resetSimulation()
@@ -94,7 +106,7 @@ class PandaEnv(gym.Env):
         self.tableUid = p.loadURDF(os.path.join(urdfRootPath, "objects/table/table.urdf"), basePosition=[0.5, 0, -0.65])
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
-        return self.get_state()
+        return self.get_state(), {}
 
     def step(self, action):
         """
@@ -114,25 +126,24 @@ class PandaEnv(gym.Env):
 
         # Ensure good action distance + save computation cost + make delta_step customizable without additional tuning
         while distance > self.ik_precision_treshold and repeat_counter < self.max_ik_repeat:
-
-            #if self.debug:
+            # if self.debug:
             #    p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
 
             computed_ik_joint_pos = p.calculateInverseKinematics(self.pandaUid, 11, target_end_effector_pos,
                                                                  self.fixed_orientation)
 
             p.setJointMotorControlArray(self.pandaUid, list(range(7)), p.POSITION_CONTROL,
-                                        list(computed_ik_joint_pos[:-2]), forces=[500.0]*7)
+                                        list(computed_ik_joint_pos[:-2]), forces=[500.0] * 7)
             p.setJointMotorControl2(self.pandaUid, self.right_finger_idx,
                                     p.POSITION_CONTROL, fingers, force=self.rf_force)
             p.setJointMotorControl2(self.pandaUid, self.left_finger_idx,
                                     p.POSITION_CONTROL, fingers, force=self.lf_force)
-            #p.setJointMotorControl2(self.pandaUid, self.right_finger_idx,
+            # p.setJointMotorControl2(self.pandaUid, self.right_finger_idx,
             #                        p.POSITION_CONTROL, fingers, force=20.0)
-            #p.setJointMotorControl2(self.pandaUid, self.left_finger_idx,
+            # p.setJointMotorControl2(self.pandaUid, self.left_finger_idx,
             #                        p.POSITION_CONTROL, fingers, force=25.0)
             p.stepSimulation()
-            #time.sleep(self.fixedTimeStep)
+            # time.sleep(self.fixedTimeStep)
 
             distance = self.get_distance(target_end_effector_pos, self.get_end_effector_pos())
             repeat_counter += 1
@@ -140,7 +151,8 @@ class PandaEnv(gym.Env):
         if self.debug:
             self._debug_step()
 
-        return self.get_state(), self._get_reward(), self._get_done(), self._get_info()
+        truncate = False
+        return self.get_state(), self._get_reward(), self._get_done(), truncate, self._get_info()
 
     def simulate(self, action):
         """
@@ -160,25 +172,24 @@ class PandaEnv(gym.Env):
 
         # Ensure good action distance + save computation cost + make delta_step customizable without additional tuning
         while distance > self.ik_precision_treshold and repeat_counter < self.max_ik_repeat:
-
-            #if self.debug:
+            # if self.debug:
             #    p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
 
             computed_ik_joint_pos = p.calculateInverseKinematics(self.pandaUid, 11, target_end_effector_pos,
                                                                  self.fixed_orientation)
 
             p.setJointMotorControlArray(self.pandaUid, list(range(7)), p.POSITION_CONTROL,
-                                        list(computed_ik_joint_pos[:-2]), forces=[500.0]*7)
+                                        list(computed_ik_joint_pos[:-2]), forces=[500.0] * 7)
             p.setJointMotorControl2(self.pandaUid, self.right_finger_idx,
                                     p.POSITION_CONTROL, fingers, force=self.rf_force)
             p.setJointMotorControl2(self.pandaUid, self.left_finger_idx,
                                     p.POSITION_CONTROL, fingers, force=self.lf_force)
-            #p.setJointMotorControl2(self.pandaUid, self.right_finger_idx,
+            # p.setJointMotorControl2(self.pandaUid, self.right_finger_idx,
             #                        p.POSITION_CONTROL, fingers, force=20.0)
-            #p.setJointMotorControl2(self.pandaUid, self.left_finger_idx,
+            # p.setJointMotorControl2(self.pandaUid, self.left_finger_idx,
             #                        p.POSITION_CONTROL, fingers, force=25.0)
             p.stepSimulation()
-            #time.sleep(self.fixedTimeStep)
+            # time.sleep(self.fixedTimeStep)
 
             distance = self.get_distance(target_end_effector_pos, self.get_end_effector_pos())
             repeat_counter += 1
@@ -198,7 +209,6 @@ class PandaEnv(gym.Env):
 
         # Ensure good action distance + save computation cost + make delta_step customizable without additional tuning
         while distance > self.ik_precision_treshold and repeat_counter < self.max_ik_repeat:
-
             computed_ik_joint_pos = p.calculateInverseKinematics(self.pandaUid, 11, target_end_effector_pos,
                                                                  self.fixed_orientation)
 
@@ -208,12 +218,11 @@ class PandaEnv(gym.Env):
             p.stepSimulation()
             distance = self.get_distance(target_end_effector_pos, self.get_end_effector_pos())
             repeat_counter += 1
-        #if self.debug:
-        #p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
-        #p.stepSimulation()
+        # if self.debug:
+        # p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
+        # p.stepSimulation()
 
-        #self.step([0, 0, 0, 0])
-
+        # self.step([0, 0, 0, 0])
 
     def _get_target_pos(self, action):
         """
@@ -244,8 +253,8 @@ class PandaEnv(gym.Env):
         """
         :return: Get the vector state returned by the environment
         """
-        return self.get_fingers_pos() + self.get_left_finger_force_vec() + \
-               self.get_right_finger_force_vec()
+        return np.asarray(self.get_fingers_pos() + self.get_left_finger_force_vec() + \
+            self.get_right_finger_force_vec(), dtype=np.float32)
 
     def get_state(self):
         """
@@ -311,7 +320,7 @@ class PandaEnv(gym.Env):
         if self.grayscale:
             rgb_array = rgb_array[:, :, 0] * 0.2989 + rgb_array[:, :, 1] * 0.587 + \
                         rgb_array[:, :, 2] * 0.114
-            rgb_array = rgb_array[np.newaxis, :, :]
+            rgb_array = np.round(rgb_array[np.newaxis, :, :]).astype(np.uint8)
         else:
             rgb_array = np.moveaxis(rgb_array, [0, 1, 2], [1, 2, 0])
 
@@ -358,3 +367,6 @@ class PandaEnv(gym.Env):
         """
         return math.sqrt((vec[0] - target_vec[0]) ** 2 + (vec[1] - target_vec[1]) ** 2 + (vec[2] - target_vec[2]) ** 2)
 
+    def render(self):
+        return self.render_image(self.top_pos_camera, self.top_orn_camera, camera_width=self.width_camera,
+                                 camera_height=self.height_camera, nearVal=0.26).T

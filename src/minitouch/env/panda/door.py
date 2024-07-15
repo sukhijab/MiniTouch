@@ -1,5 +1,4 @@
-from gym import spaces
-from gym import spaces
+from gymnasium import spaces
 
 import os, inspect
 import pybullet as p
@@ -8,14 +7,17 @@ import random
 from minitouch.env.panda.panda_haptics import PandaHaptics
 from minitouch.env.panda.common.log_specification import LogSpecification
 from minitouch.env.panda.common.bound_3d import Bound3d
-#from gibson2.objects.articulated_object import ArticulatedObject
-#import gibson2
+from typing import Any
+
+# from gibson2.objects.articulated_object import ArticulatedObject
+# import gibson2
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 urdfRootPath = currentdir + "/assets/"
 import math
+
 
 class DoorEnv(PandaHaptics):
 
@@ -27,7 +29,7 @@ class DoorEnv(PandaHaptics):
         self.object_file_path = os.path.join(urdfRootPath, "objects/cabinet/cabinet_0004.urdf")
 
         self.space_limits = Bound3d(0.5, 0.75, -0.2, 0.2, 0.1, 0.15)
-        self.based_fixed_orientation = [0., math.pi/2, 0]
+        self.based_fixed_orientation = [0., math.pi / 2, 0]
         self.init_panda_joint_state = [-0.77, 1.50, 0.98, -2.18, 2.83, 1.66, -0.25, 0.0, 0.0]
 
         self.object_random_scale_range = (0.5, 0.5)
@@ -51,25 +53,30 @@ class DoorEnv(PandaHaptics):
             LogSpecification("found", "compute_or", 1, "success"),
         ]
 
-    def reset(self):
-        self.fixed_orientation = p.getQuaternionFromEuler((0, self.based_fixed_orientation[1], self.based_fixed_orientation[2]))
-        state = super().reset()
+    def reset(self,
+              *,
+              seed: int | None = None,
+              options: dict[str, Any] | None = None,
+              ):
+        self.fixed_orientation = p.getQuaternionFromEuler(
+            (0, self.based_fixed_orientation[1], self.based_fixed_orientation[2]))
+        state, _ = super().reset()
         self.object_start_position = list(self.cube_pos_distribution.sample())
         self.place_objects()
-        return state
+        return state, self._get_info()
 
     def place_objects(self):
-
         self.door = p.loadURDF(self.object_file_path, basePosition=[0.86, 0, 0.45],
-                                    globalScaling=1, baseOrientation=[0, 180, 0, 1])
+                               globalScaling=1, baseOrientation=[0, 180, 0, 1])
 
     def step(self, action):
         self.current_orn += self.delta_orn * action[4]
-        self.current_orn = min(max(self.current_orn, -math.pi/4), math.pi/4)
-        self.fixed_orientation = p.getQuaternionFromEuler((self.current_orn, self.based_fixed_orientation[1], self.based_fixed_orientation[2]))
-        step, reward, done, info = super().step(action)
+        self.current_orn = min(max(self.current_orn, -math.pi / 4), math.pi / 4)
+        self.fixed_orientation = p.getQuaternionFromEuler(
+            (self.current_orn, self.based_fixed_orientation[1], self.based_fixed_orientation[2]))
+        step, reward, terminate, truncate, info = super().step(action)
 
-        return step, reward, done, info
+        return step, reward, terminate, truncate, info
 
     def _get_done(self):
         return self._get_door_angle() > self.treshold_found
@@ -107,8 +114,8 @@ class DoorEnv(PandaHaptics):
 
     def get_all_sides_image(self, width, height):
 
-        self.top_pos_camera = [(self.space_limits.x_high + self.space_limits.x_low)/2,
-                               (self.space_limits.y_high + self.space_limits.y_low)/2,
+        self.top_pos_camera = [(self.space_limits.x_high + self.space_limits.x_low) / 2,
+                               (self.space_limits.y_high + self.space_limits.y_low) / 2,
                                0.05]
 
         self.top_orn_camera = [0, -90, 0]

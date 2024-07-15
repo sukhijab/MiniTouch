@@ -1,4 +1,4 @@
-from gym import spaces
+from gymnasium import spaces
 import glob
 import os, inspect
 import pybullet as p
@@ -7,6 +7,7 @@ import random
 from minitouch.env.panda.panda_haptics import PandaHaptics
 from minitouch.env.panda.common.bound_3d import Bound3d
 from minitouch.env.panda.common.log_specification import LogSpecification
+from typing import Any
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
@@ -50,11 +51,15 @@ class Grasp(PandaHaptics):
 
         self.last_cube_id = None
 
-    def reset(self):
-        state = super().reset()
+    def reset(self,
+              *,
+              seed: int | None = None,
+              options: dict[str, Any] | None = None,
+              ):
+        state, _ = super().reset()
         self.grasp_state = 0
         self.place_objects()
-        return state
+        return state, self._get_info()
 
     def place_objects(self):
         num_objects = random.randint(self.number_of_object_interval[0], self.number_of_object_interval[1])
@@ -113,22 +118,22 @@ class Grasp(PandaHaptics):
 
     def step(self, action):
         return super().step(action)
-        state, reward, done, info = super().step(action)
-
-        if action[3] > (1 - self.lift_threshold):
-            for i in range(self.repeat_grasp_action*2):
-                temp_action = [0.0, 0.00, 0, -1, 0]
-                #state, reward, done, info = super().step(temp_action)
-                super().simulate(temp_action)
-
-            for i in range(self.repeat_grasp_action):
-                temp_action = [0.0, 0.00, 0.1*(20/self.repeat_grasp_action), -1, 0]
-                super().simulate(temp_action)
-
-            temp_action = [0.0, 0.00, 0.1, -1, 0]
-            state, reward, done, info = super().step(temp_action)
-
-        return state, reward, done, info
+        # state, reward, terminate, truncate, info = super().step(action)
+        #
+        # if action[3] > (1 - self.lift_threshold):
+        #     for i in range(self.repeat_grasp_action*2):
+        #         temp_action = [0.0, 0.00, 0, -1, 0]
+        #         #state, reward, done, info = super().step(temp_action)
+        #         super().simulate(temp_action)
+        #
+        #     for i in range(self.repeat_grasp_action):
+        #         temp_action = [0.0, 0.00, 0.1*(20/self.repeat_grasp_action), -1, 0]
+        #         super().simulate(temp_action)
+        #
+        #     temp_action = [0.0, 0.00, 0.1, -1, 0]
+        #     state, reward, done, info = super().step(temp_action)
+        #
+        # return state, reward, done, info
 
     def _get_done(self):
         if not self.space_limits.is_inside(self.get_object_pos()):

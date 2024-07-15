@@ -8,6 +8,7 @@ import math
 from minitouch.env.panda.panda_haptics import PandaHaptics
 from minitouch.env.panda.common.log_specification import LogSpecification
 from minitouch.env.panda.common.bound_3d import Bound3d
+from typing import Any
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
@@ -71,14 +72,18 @@ class MoveCubeEasy(PandaHaptics):
 
         ]
 
-    def reset(self):
-        state = super().reset()
+    def reset(self,
+              *,
+              seed: int | None = None,
+              options: dict[str, Any] | None = None,
+              ):
+        state, info = super().reset()
         self.set_cube_positions()
         self.randomize_hand_pos()
         self.place_objects()
         self.old_distance = self.get_distance(self.object_start_position, self.target_cube_pos)
         self.step([0, 0, 0, 0])
-        return state
+        return state, info
 
     def randomize_hand_pos(self):
 
@@ -149,17 +154,17 @@ class MoveCubeEasy(PandaHaptics):
                             rgbaColor=[0.7, 0.7, 0.7, 1])
 
     def step(self, action):
-        step, reward, done, info = super().step(action)
+        state, reward, terminate, truncate, info = super().step(action)
         self.old_distance = self.get_distance(self.get_object_pos(), self.target_cube_pos)
-        return step, reward, done, info
+        return state, reward, terminate, truncate, info
 
     def _get_done(self):
         if self.get_distance(self.get_object_pos(), self.target_cube_pos) < self.treshold_found:
-            return 1
+            return True
         elif not self.space_limits.is_inside(self.get_object_pos()):
-            return 1
+            return True
         # else:
-        return 0
+        return False
 
     def get_object_pos(self):
         return p.getBasePositionAndOrientation(self.objectUid)[0]

@@ -1,4 +1,4 @@
-from gym import spaces
+from gymnasium import spaces
 
 import os, inspect
 import pybullet as p
@@ -6,6 +6,7 @@ import numpy as np
 import random
 from minitouch.env.panda.panda_gym import PandaEnv
 from minitouch.env.panda.common.bound_3d import Bound3d
+from typing import Any
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
@@ -15,23 +16,30 @@ urdfRootPath = currentdir + "/assets/"
 
 class PandaHaptics(PandaEnv):
 
-    def __init__(self, delta_step_joint=0.06, delta_step_fingers=0.075, discrete_grasp=False, grasp_threshold=-1,
-                 haptics_upper_bound=500, **kwargs):
+    def __init__(self, delta_step_joint: float = 0.06,
+                 delta_step_fingers: float = 0.075,
+                 discrete_grasp: float = False,
+                 grasp_threshold: float = -1,
+                 haptics_upper_bound: float = 500,
+                 **kwargs):
 
         super(PandaHaptics, self).__init__(**kwargs)
         # Robots bounds for this tasks
-        self.space_limits = Bound3d(0.5, 0.75, -0.20, 0.25, 0.01, 0.025)
+        self.space_limits = Bound3d(0.5, 0.75, -0.20, 0.5, 0.05, 0.05)
         self.max_force = haptics_upper_bound
 
         if self.grayscale:
             self.visual_observation_space = spaces.Box(low=0, high=255,
-                                                       shape=(1, self.height_camera, self.width_camera))
+                                                       shape=(1, self.height_camera, self.width_camera),
+                                                       dtype=np.uint8
+                                                       )
         else:
             self.visual_observation_space = spaces.Box(low=0, high=255,
-                                                       shape=(3, self.height_camera, self.width_camera))
+                                                       shape=(3, self.height_camera, self.width_camera),
+                                                       dtype=np.uint8)
 
         self.vector_observation_space = spaces.Box(low=np.array(
-            [0, 0, -self.max_force, -self.max_force, -self.max_force, -self.max_force, -self.max_force, -self.max_force,
+            [-0.01, -0.01, -self.max_force, -self.max_force, -self.max_force, -self.max_force, -self.max_force, -self.max_force,
              self.space_limits.x_low, self.space_limits.y_low,
              self.space_limits.z_low]),
             high=np.array(
@@ -45,7 +53,12 @@ class PandaHaptics(PandaEnv):
             high=np.array([self.max_force] * 6)
         )
 
-        self.observation_space = spaces.Tuple((self.visual_observation_space, self.vector_observation_space))
+        self.observation_space = spaces.Dict(
+            {
+                'pixels': self.visual_observation_space,
+                'state': self.vector_observation_space,
+            }
+        )
 
         # Amplitude of each action
         self.delta_step_joint = delta_step_joint
@@ -54,10 +67,14 @@ class PandaHaptics(PandaEnv):
         self.grasp_threshold = grasp_threshold
         self.state_grasp = False
 
-    def reset(self):
-        state = super().reset()
+    def reset(self,
+              *,
+              seed: int | None = None,
+              options: dict[str, Any] | None = None,
+              ):
+        state, info = super().reset()
         self.state_grasp = False
-        return state
+        return state, {}
 
     def step(self, action):
 
@@ -72,8 +89,8 @@ class PandaHaptics(PandaEnv):
             else:
                 action[3] = 1
 
-        state, reward, done, info = super().step(action)
-        return state, reward, done, info
+        state, reward, terminate, truncate, info = super().step(action)
+        return state, reward, terminate, truncate, info
 
     def set_grasp_properties(self, discrete_grasp, grasp_threshold=0.4):
         self.discrete_grasp = discrete_grasp
@@ -128,11 +145,16 @@ class PandaHaptics(PandaEnv):
         :return: Get the vector state returned by the environment
         """
         # TODO: Add angular velocity + linear velocity of end effector
-        return self.get_fingers_pos() + self.get_left_finger_force_vec() + self.get_right_finger_force_vec() \
-               + self.get_end_effector_pos()
+        return np.asarray(self.get_fingers_pos() + self.get_left_finger_force_vec() + self.get_right_finger_force_vec() \
+               + self.get_end_effector_pos(), dtype=np.float32)
 
     def get_state(self):
-        return self.get_all_sides_image(self.width_camera, self.height_camera), self.get_vector_state()
+        state = self.get_vector_state()
+        state = {
+        'pixels': self.get_all_sides_image(self.width_camera, self.height_camera),
+        'state': state
+        }
+        return state
 
     def get_all_sides_image(self, width, height):
 
@@ -167,5 +189,6 @@ class PandaHaptics(PandaEnv):
         top_image = self.render_image(self.top_pos_camera, self.top_orn_camera, width, height, nearVal=0.26)
         #import pdb; pdb.set_trace()
         # return np.concatenate((top_image, side_image, back_image), axis=0)
+        top_image = np.round(top_image).astype(np.uint8)
         return top_image
         # return np.expand_dims(top_image,0)

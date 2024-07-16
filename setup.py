@@ -17,4 +17,8 @@ setuptools.setup(
     include_package_data=True,
     install_requires=['gymnasium==0.29.1', 'pybullet'],
     python_requires=">=3.8",
+    package_data={
+        # If using find_packages(), include the URDF files in the package
+        'minitouch': ['assets/*.urdf'],
+    },
 )

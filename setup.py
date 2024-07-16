@@ -19,6 +19,6 @@ setuptools.setup(
     python_requires=">=3.8",
     package_data={
         # If using find_packages(), include the URDF files in the package
-        'minitouch': ['assets/*.urdf'],
+        'minitouch': ['env/panda/assets/*.'],
     },
 )

@@ -1,6 +1,4 @@
 import setuptools
-from setuptools import find_packages
-
 
 setuptools.setup(
     name="minitouch",
@@ -13,7 +11,8 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
-    packages=[package for package in find_packages() if package.startswith("robosuite")],
+    packages=setuptools.find_packages(where="src"),
+    package_dir={"": "src"},
     eager_resources=["*"],
     include_package_data=True,
     install_requires=['gymnasium==0.29.1', 'pybullet'],

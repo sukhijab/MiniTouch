@@ -1,4 +1,4 @@
-from gym import spaces
+from gymnasium import spaces
 
 import os, inspect
 import pybullet as p
